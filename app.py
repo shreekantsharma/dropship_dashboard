@@ -370,8 +370,26 @@ if uploaded_file:
         with st.expander("📅 Delivery Analysis by Date", expanded=False):
             st.subheader("Daily Delivery Performance")
             
+            # Use explicit conditional columns for aggregation to avoid index collisions with apply
+            valid_orders['is_delivered'] = (valid_orders['status_bucket'] == 'DELIVERED').astype(int)
+            valid_orders['is_rto'] = (valid_orders['status_bucket'] == 'RTO').astype(int)
+            valid_orders['is_undelivered'] = (valid_orders['status_bucket'] == 'UNDELIVERED').astype(int)
+            
             # Group by Date
-            date_grp = valid_orders.groupby(valid_orders['order_date'].dt.date).apply(
+            # Grouper might be named 'order_date' by default, matching col name, so we rename it
+            date_grp = valid_orders.groupby(valid_orders['order_date'].dt.date.rename('Date')).agg({
+                'order_id': 'nunique',
+                'is_delivered': 'sum', # Count of orders delivered logic (approx if unique order_ids matter, but status is per line. Assuming 1 line per order or consistent status)
+                # Wait, status is per line. If order has multiple lines, we want unique ORDERS.
+                # Summing lines might be wrong if multiple lines per order.
+                # Correct logic for unique orders by status:
+            })
+            # Actually, standard groupby sum is risky if multiple lines per order. 
+            # Reverting to safer agg with nunique on filtered subsets is hard in one pass without apply.
+            # Best approach: Pivot or Apply with robust index handling.
+            
+            # Let's try the Apply approach but fixing the index name issue explicitly.
+            date_grp = valid_orders.groupby(valid_orders['order_date'].dt.date.rename('GroupDate')).apply(
                  lambda x: pd.Series({
                     'Orders': x['order_id'].nunique(),
                     'Delivered': x[x['status_bucket'] == 'DELIVERED']['order_id'].nunique(),
@@ -379,7 +397,7 @@ if uploaded_file:
                     'Undelivered': x[x['status_bucket'] == 'UNDELIVERED']['order_id'].nunique()
                 })
             ).reset_index()
-            date_grp.rename(columns={'order_date': 'Date'}, inplace=True)
+            date_grp.rename(columns={'GroupDate': 'Date'}, inplace=True)
             
             date_grp['Order Share %'] = (date_grp['Orders'] / synced_orders_count * 100).round(2)
             denom_date = date_grp['Delivered'] + date_grp['RTO'] + date_grp['Undelivered']
