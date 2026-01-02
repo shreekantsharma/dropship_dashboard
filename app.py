@@ -69,7 +69,7 @@ def normalize_columns(df):
     # Define mapping priorities (lower case)
     mapping = {
         'order_id': ['order id', 'id', 'order_no', 'order number', 'order_name'],
-        'order_date': ['created at', 'order date', 'date', 'timestamp', 'created_at'],
+        'order_date': ['channel created at', 'created at', 'order date', 'date', 'timestamp', 'created_at'],
         'order_status': ['status', 'order status', 'fulfillment status', 'financial status'],
         'payment_method': ['payment method', 'payment mode', 'type'],
         'product_name': ['product name', 'item name', 'title', 'lineitem name'],
