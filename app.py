@@ -366,6 +366,38 @@ if uploaded_file:
             else:
                  st.info("Margin data not available.")
 
+        # --- Delivery by Date (New Request) ---
+        with st.expander("📅 Delivery Analysis by Date", expanded=False):
+            st.subheader("Daily Delivery Performance")
+            
+            # Group by Date
+            date_grp = valid_orders.groupby(valid_orders['order_date'].dt.date).apply(
+                 lambda x: pd.Series({
+                    'Orders': x['order_id'].nunique(),
+                    'Delivered': x[x['status_bucket'] == 'DELIVERED']['order_id'].nunique(),
+                    'RTO': x[x['status_bucket'] == 'RTO']['order_id'].nunique(),
+                    'Undelivered': x[x['status_bucket'] == 'UNDELIVERED']['order_id'].nunique()
+                })
+            ).reset_index()
+            date_grp.rename(columns={'order_date': 'Date'}, inplace=True)
+            
+            date_grp['Order Share %'] = (date_grp['Orders'] / synced_orders_count * 100).round(2)
+            denom_date = date_grp['Delivered'] + date_grp['RTO'] + date_grp['Undelivered']
+            date_grp['Delivered %'] = np.where(denom_date > 0, (date_grp['Delivered'] / denom_date * 100), 0)
+            date_grp['RTO %'] = np.where(denom_date > 0, (date_grp['RTO'] / denom_date * 100), 0)
+            
+            st.dataframe(
+                date_grp[['Date', 'Orders', 'Order Share %', 'Delivered %', 'RTO %']].sort_values('Date', ascending=False),
+                column_config={
+                     "Date": st.column_config.DateColumn("Date", format="DD MMM YYYY"),
+                     "Order Share %": st.column_config.NumberColumn(format="%.2f%%"),
+                     "Delivered %": st.column_config.NumberColumn(format="%.2f%%"),
+                     "RTO %": st.column_config.NumberColumn(format="%.2f%%")
+                },
+                hide_index=True,
+                use_container_width=True
+            )
+
         # --- Donuts Row ---
         d1, d2, d3 = st.columns(3)
         
